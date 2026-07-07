@@ -12,15 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pytest
 import torch
 
 from diffusers import SolarVisionTransformer2DModel
 from diffusers.utils.torch_utils import randn_tensor
 
-from ...testing_utils import enable_full_determinism, torch_device
+from ...testing_utils import enable_full_determinism, require_torch_gpu, torch_device
 from ..testing_utils import (
     BaseModelTesterConfig,
     ModelTesterMixin,
+    TorchCompileTesterMixin,
     TrainingTesterMixin,
 )
 
@@ -93,3 +95,32 @@ class TestSolarVisionTransformer(SolarVisionTransformerTesterConfig, ModelTester
 class TestSolarVisionTransformerTraining(SolarVisionTransformerTesterConfig, TrainingTesterMixin):
     def test_gradient_checkpointing_is_applied(self):
         super().test_gradient_checkpointing_is_applied(expected_set={"SolarVisionTransformer2DModel"})
+
+
+class TestSolarVisionTransformerCompile(SolarVisionTransformerTesterConfig, TorchCompileTesterMixin):
+    @property
+    def different_shapes_for_compilation(self):
+        return [(16, 16), (16, 32), (32, 32)]
+
+    @pytest.mark.skip(
+        reason="Variable-length text conditioning uses data-dependent sequence lengths, so fullgraph "
+        "compilation with error_on_recompile=True is not supported."
+    )
+    def test_torch_compile_recompilation_and_graph_break(self):
+        super().test_torch_compile_recompilation_and_graph_break()
+
+    @pytest.mark.skip(reason="SolarVisionTransformer2DModel has no `_repeated_blocks` set.")
+    def test_torch_compile_repeated_blocks(self, recompile_limit=1):
+        super().test_torch_compile_repeated_blocks(recompile_limit)
+
+    @require_torch_gpu
+    def test_compile_with_group_offloading(self):
+        super().test_compile_with_group_offloading()
+
+    @pytest.mark.skip(reason="Fullgraph AoT is broken.")
+    def test_compile_works_with_aot(self, tmp_path):
+        super().test_compile_works_with_aot(tmp_path)
+
+    @pytest.mark.skip(reason="Variable-length text conditioning is not compatible with fullgraph dynamic shapes.")
+    def test_compile_on_different_shapes(self):
+        super().test_compile_on_different_shapes()

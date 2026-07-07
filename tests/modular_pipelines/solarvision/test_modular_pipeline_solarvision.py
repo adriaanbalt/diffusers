@@ -24,7 +24,7 @@ from diffusers import (
     SolarVisionTransformer2DModel,
 )
 
-from ...testing_utils import enable_full_determinism
+from ...testing_utils import enable_full_determinism, skip_mps
 from ..test_modular_pipelines_common import ModularPipelineTesterMixin
 
 
@@ -134,6 +134,6 @@ class TestSolarVisionModularPipelineFast(ModularPipelineTesterMixin):
     def test_load_expected_components_from_pretrained(self, tmp_path):
         pass
 
-    @pytest.mark.skip(reason="auto_cpu_offload requires mem_get_info not available on all devices.")
+    @skip_mps
     def test_components_auto_cpu_offload_inference_consistent(self):
-        pass
+        super().test_components_auto_cpu_offload_inference_consistent()
