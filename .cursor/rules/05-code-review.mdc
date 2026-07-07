@@ -1,0 +1,128 @@
+---
+description: Anti-pattern detection and common mistakes to catch before code review
+globs: ["src/diffusers/**", "tests/**"]
+alwaysApply: false
+---
+
+# Code Review — Anti-Pattern Detection
+
+When reviewing or writing code for diffusers, actively check for these patterns. Flag them immediately — don't let them reach human reviewers.
+
+## Critical violations (will block PR)
+
+### Architecture and naming
+
+- [ ] Directory slug is concatenated lowercase (e.g. `modular_pipelines/solarvision/`)
+
+### Import registration
+
+- [ ] New class exists but is NOT in sub-package `__init__.py`
+- [ ] New class exists but is NOT in top-level `src/diffusers/__init__.py`
+- [ ] Lazy import structure is missing or malformed
+
+### Dependencies
+
+- [ ] `import einops` or `from einops import` — REWRITE with native PyTorch
+- [ ] New mandatory dependency without `is_X_available()` guard
+- [ ] Missing dummy object in `utils/dummy_*.py` for optional dep
+
+### Dtype violations
+
+- [ ] `torch.float64` or `.double()` anywhere in model code
+- [ ] `torch.empty` used for parameter initialization
+- [ ] Hardcoded dtype in `forward` method (use input tensor's dtype)
+- [ ] Reading `self.linear.weight.dtype` for casting (breaks under quantization)
+
+### Pipeline violations
+
+- [ ] `__call__` missing `@torch.no_grad()` decorator
+- [ ] Redundant `with torch.no_grad():` inside method called from `__call__`
+- [ ] Modifying registered component state inside `__call__` (`.to(dtype)`, attribute changes)
+- [ ] Subclassing another pipeline (e.g., `class Img2Img(TextToImg):`)
+- [ ] Inlining scheduler math instead of using `self.scheduler.step()`
+- [ ] `@property` used for static config values (should be `__init__` attribute)
+
+### Modular pipeline violations
+
+- [ ] Importing from `diffusers.pipelines.*` in modular code
+- [ ] Cross-importing between modular pipelines
+- [ ] `guidance_scale` accepted as pipeline input (belongs to guider)
+- [ ] Component instantiated inline instead of via `ComponentSpec`
+- [ ] Writing to `block_state` without declaring `OutputParam`
+- [ ] Using `state.set()` directly inside a block
+- [ ] No-op skip logic inside a block (should use `AutoPipelineBlocks` with trigger)
+
+### Model violations
+
+- [ ] Layer calls hidden in helper functions (not visible in `forward`)
+- [ ] NumPy operations in forward (breaks `torch.compile` fullgraph)
+- [ ] Custom `from_pretrained` override
+- [ ] Manual weight loading at runtime (`load_file`, `hf_hub_download`)
+- [ ] `_supports_gradient_checkpointing = True` but no checkpoint branches in forward
+- [ ] Missing `_no_split_modules` declaration
+
+### Test violations
+
+- [ ] Test model hosted on personal repo (must be `hf-internal-testing/`)
+- [ ] Component sizes too large (CI will timeout)
+- [ ] LoRA tests included in initial PR
+- [ ] `@slow` tests included in initial PR
+- [ ] Missing `torch.manual_seed(0)` in `get_dummy_components`
+
+## Deprecated API detection
+
+Flag usage of these deprecated patterns — suggest the modern replacement:
+
+| Deprecated | Replacement |
+|-----------|-------------|
+| `from diffusers.utils import randn_tensor` | Use `torch.randn` directly |
+| `CrossAttnProcessor` | Model-specific processor with `dispatch_attention_fn` |
+| `AttnProcessor()` (generic) | Model-specific processor pattern |
+| `LoRAAttnProcessor` | `PeftAdapterMixin` with PEFT library |
+| `F.scaled_dot_product_attention` | `dispatch_attention_fn` for backend compatibility |
+| `.from_ckpt()` | `.from_single_file()` |
+| `VaeImageProcessor` (old import path) | `diffusers.image_processor.VaeImageProcessor` |
+| Guidance scale in pipeline `__call__` (modular) | Configure on guider object separately |
+
+## Test coverage gaps
+
+Flag when new code lacks corresponding tests:
+
+- [ ] New model class in `models/transformers/` → must have `tests/models/transformers/test_models_transformer_*.py`
+- [ ] New pipeline in `pipelines/` → must have `tests/pipelines/*/test_*.py`
+- [ ] New scheduler → must have `tests/schedulers/test_scheduler_*.py`
+- [ ] `get_dummy_components` builds ALL registered components (not a subset)
+- [ ] `get_dummy_inputs` covers the pipeline's `params` list completely
+- [ ] Test methods contain actual assertions (not just `pass` or empty bodies)
+
+## Warnings (fix before merge, won't block review)
+
+### Attention
+
+- [ ] `attention_mask` declared in signature but never used
+- [ ] All-zero mask passed instead of `None`
+- [ ] Dense float mask that blocks flash/sage backends
+
+### Code style
+
+- [ ] Missing `# Copied from` annotation for reused methods
+- [ ] Deeply nested modular block composition (prefer flat)
+- [ ] Template used when semantics don't match (misleading docs)
+
+### Performance
+
+- [ ] Unnecessary `.clone()` or `.contiguous()` calls
+- [ ] Allocating tensors in a loop instead of pre-allocating
+- [ ] Using `.item()` in a hot loop (triggers sync)
+
+## Auto-fix suggestions
+
+When you detect these patterns, suggest the fix:
+
+| Pattern | Fix |
+|---------|-----|
+| `einops.rearrange(x, 'b c h w -> b (h w) c')` | `x.permute(0, 2, 3, 1).reshape(b, h*w, c)` |
+| `torch.float64` | `torch.float32` (or `maybe_adjust_dtype_for_device`) |
+| `torch.empty(...)` | `torch.zeros(...)` |
+| `self.linear.weight.dtype` | `hidden_states.dtype` |
+| Inline scheduler step | `self.scheduler.step(noise_pred, t, latents).prev_sample` |

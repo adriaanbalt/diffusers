@@ -1,0 +1,145 @@
+---
+description: Testing patterns and requirements for pipelines and models
+globs: ["tests/**"]
+alwaysApply: false
+---
+
+# Testing Standards
+
+## Two required test layers
+
+Every new pipeline PR must include:
+1. **Pipeline-level tests** — always required
+2. **Model-level tests** — required if introducing a new model class
+
+Integration/slow tests and LoRA tests are NOT added in the initial PR.
+
+## Pipeline-level tests
+
+Location: `tests/pipelines/<slug>/test_<slug>.py` (slug matches pipeline directory, e.g. `tests/pipelines/solarvision/test_solarvision.py`)
+
+Reference: `tests/pipelines/wan/test_wan.py`
+
+### Structure
+
+```python
+from ..test_pipelines_common import PipelineTesterMixin
+from ..pipeline_params import (
+    TEXT_TO_IMAGE_BATCH_PARAMS,
+    TEXT_TO_IMAGE_IMAGE_PARAMS,
+    TEXT_TO_IMAGE_PARAMS,
+)
+
+class MyModelPipelineTest(PipelineTesterMixin, unittest.TestCase):
+    pipeline_class = MyModelPipeline
+    params = TEXT_TO_IMAGE_PARAMS
+    batch_params = TEXT_TO_IMAGE_BATCH_PARAMS
+    image_params = TEXT_TO_IMAGE_IMAGE_PARAMS
+    required_optional_params = frozenset(["generator", "num_inference_steps"])
+    
+    # Capability flags
+    test_xformers_attention = True
+    supports_dduf = False
+    
+    def get_dummy_components(self):
+        """Build all sub-modules with TINY configs."""
+        torch.manual_seed(0)
+        transformer = MyModelTransformer(
+            num_layers=2,          # TINY
+            attention_head_dim=8,  # TINY
+            num_attention_heads=2, # TINY
+        )
+        scheduler = FlowMatchEulerDiscreteScheduler()
+        # ... other components with minimal sizes
+        return {
+            "transformer": transformer,
+            "scheduler": scheduler,
+            # ...
+        }
+    
+    def get_dummy_inputs(self, device, seed=0):
+        """Deterministic inputs for reproducible tests."""
+        generator = torch.Generator(device=device).manual_seed(seed)
+        return {
+            "prompt": "a photo of a cat",
+            "num_inference_steps": 2,
+            "generator": generator,
+            "height": 16,   # TINY
+            "width": 16,    # TINY
+            "output_type": "np",
+        }
+```
+
+### Critical rules
+
+- Component sizes must be TINY — small `num_layers`, small dims, low resolution
+- Use `torch.manual_seed(0)` before each component in `get_dummy_components`
+- Skip unsupported inherited tests with `@unittest.skip("Test not supported")` — don't delete
+- One test file per pipeline variant (T2V, I2V, V2V)
+
+## Model-level tests
+
+Location: `tests/models/transformers/test_models_transformer_<slug>.py`
+
+### Generate, don't write by hand
+
+```bash
+python utils/generate_model_tests.py src/diffusers/models/transformers/transformer_<slug>.py
+```
+
+Run with NO `--include` flags initially. The generator auto-detects applicable testers.
+
+### What you fill in
+
+The generator creates a `TesterConfig` with TODOs:
+
+```python
+class MyModelTransformerTesterConfig:
+    pretrained_model_name_or_path = "hf-internal-testing/tiny-my-model"  # MUST be hf-internal-testing/
+    
+    @staticmethod
+    def get_init_dict():
+        return {
+            "num_layers": 2,
+            "attention_head_dim": 8,
+            "num_attention_heads": 2,
+            # ... tiny config matching your model's __init__ params
+        }
+    
+    @staticmethod
+    def get_dummy_inputs(batch_size=2):
+        return {
+            "hidden_states": torch.randn(batch_size, 16, 8),
+            "timestep": torch.tensor([1.0] * batch_size),
+            # ... minimal inputs
+        }
+    
+    input_shape = (16, 8)
+    output_shape = (16, 8)
+```
+
+### Rules
+
+- Test models MUST live under `hf-internal-testing/` — never personal repos
+- Do NOT add `LoraTesterMixin` in initial PR
+- Do NOT add `@slow` / integration tests in initial PR
+- Keep init dims small for fast CI
+
+## What NOT to test initially
+
+- LoRA (comes in follow-up PR)
+- Integration/slow tests (`@slow` decorator)
+- Quantization tests
+- Caching tests
+- IP adapter tests
+
+These are discussed with maintainers after the initial PR is merged.
+
+## Style checks (must pass)
+
+```bash
+make style    # Auto-format code
+make quality  # Lint and check conventions
+```
+
+Run both before submitting. CI will fail if these don't pass.

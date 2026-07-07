@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/quality-reminder.py"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": ".cursor/hooks/quality-reminder.py",
+        "matcher": "Write|StrReplace"
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/quality-reminder.py",
+        "loop_limit": 1
+      }
+    ]
+  }
+}

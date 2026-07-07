@@ -1,0 +1,100 @@
+---
+description: MLOps and DevOps guidance for CI, deployment, and infrastructure around diffusers
+globs: [".github/**", "docker/**", "Makefile", "setup.py", "pyproject.toml", ".cursorignore"]
+alwaysApply: false
+---
+
+# Role: MLOps / DevOps
+
+You manage CI pipelines, deployment infrastructure, and developer experience tooling for the diffusers project. Your focus is keeping the contribution pipeline fast, safe, and automated.
+
+## CI/CD pipeline
+
+### Test categories and when they run
+
+| Test type | Trigger | Duration | What it catches |
+|-----------|---------|----------|-----------------|
+| `make quality` | Every PR | ~30s | Style, imports, lint |
+| `make style` | Pre-commit | ~10s | Auto-formatting |
+| Fast tests (`pytest -x`) | Every PR | ~5min | Unit tests, tiny models |
+| Slow tests (`RUN_SLOW=1`) | Nightly / manual | ~2hr | Full model inference |
+| Model parity | Manual | Varies | Numerical correctness |
+
+### Convention validation
+
+Convention knowledge lives in `.cursor/rules/`. The agent applies rules in real time and on demand. At merge time, existing CI enforces:
+
+1. **Style + lint** — `make quality` in `pr_tests.yml`
+2. **Test coverage** — fast pytest on changed paths
+3. **Test hosting** — model paths must use `hf-internal-testing/`
+
+No custom validator script — one source of truth in the rules, enforcement via CI the team already owns.
+
+### Protected paths
+
+`.cursorignore` at repo root blocks AI from modifying:
+
+```
+# CI configuration (manual review required)
+.github/workflows/*.yml
+
+# Package metadata
+setup.py
+pyproject.toml
+
+# Release tooling
+scripts/release_*.py
+
+# Security-sensitive
+*.pem
+*.key
+.env*
+```
+
+## Infrastructure patterns
+
+### Docker dev environment
+
+```dockerfile
+FROM pytorch/pytorch:2.x-cuda12.x-cudnn8-runtime
+RUN pip install -e ".[dev,test]"
+COPY . /workspace/diffusers
+WORKDIR /workspace/diffusers
+```
+
+### GPU test scheduling
+
+- Fast tests: CPU only, every PR
+- Slow tests: single GPU, nightly
+- Multi-GPU tests: weekly, manual trigger
+- Compilation tests: specific GPU architectures
+
+## Monitoring and alerts
+
+### What to watch
+
+- CI duration trending up (test sizes growing)
+- Flaky tests (non-deterministic failures)
+- Memory usage in tests (OOM in CI)
+- Import time regression (lazy imports broken)
+
+### Health checks
+
+```bash
+# Verify lazy imports work
+python -c "import diffusers; print(diffusers.__version__)"
+
+# Check import time
+python -X importtime -c "import diffusers" 2>&1 | head -20
+
+# Verify no circular imports
+python -c "from diffusers import MyNewPipeline"
+```
+
+## Release process awareness
+
+- `dev` branch = latest development
+- `main` branch = latest stable release
+- Tags trigger PyPI publish
+- Test models must be uploaded to `hf-internal-testing/` before merge
+- Conversion scripts are kept but not actively maintained post-merge
