@@ -138,6 +138,7 @@ MODULAR_PIPELINE_MAPPING = OrderedDict(
         ("hunyuan-video-1.5", _create_default_map_fn("HunyuanVideo15ModularPipeline")),
         ("ltx", _create_default_map_fn("LTXModularPipeline")),
         ("ernie-image", _create_default_map_fn("ErnieImageModularPipeline")),
+        ("solarvision", _create_default_map_fn("SolarVisionModularPipeline")),
     ]
 )
 

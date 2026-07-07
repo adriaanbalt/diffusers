@@ -109,6 +109,10 @@ else:
         "LTXAutoBlocks",
         "LTXModularPipeline",
     ]
+    _import_structure["solarvision"] = [
+        "SolarVisionAutoBlocks",
+        "SolarVisionModularPipeline",
+    ]
     _import_structure["z_image"] = [
         "ZImageAutoBlocks",
         "ZImageModularPipeline",
@@ -172,6 +176,7 @@ if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
             QwenImageLayeredModularPipeline,
             QwenImageModularPipeline,
         )
+        from .solarvision import SolarVisionAutoBlocks, SolarVisionModularPipeline
         from .stable_diffusion_3 import StableDiffusion3AutoBlocks, StableDiffusion3ModularPipeline
         from .stable_diffusion_xl import StableDiffusionXLAutoBlocks, StableDiffusionXLModularPipeline
         from .wan import (
