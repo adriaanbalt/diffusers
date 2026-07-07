@@ -1,0 +1,103 @@
+---
+description: Pipeline implementation patterns for both standard and modular pipelines
+globs: ["src/diffusers/pipelines/**", "src/diffusers/modular_pipelines/**"]
+alwaysApply: false
+---
+
+# Pipeline Conventions
+
+## Standard pipeline structure
+
+Reference implementations: `pipeline_flux.py`, `pipeline_wan.py`, `pipeline_qwenimage.py`.
+
+### Class shape
+
+```python
+class MyModelPipeline(DiffusionPipeline, MyModelLoraLoaderMixin):
+    """One-line description of what this pipeline does."""
+    
+    model_cpu_offload_seq = "text_encoder->transformer->vae"
+    _optional_components = ["text_encoder_2"]
+    
+    def __init__(self, transformer, scheduler, vae, text_encoder, tokenizer):
+        super().__init__()
+        self.register_modules(
+            transformer=transformer,
+            scheduler=scheduler,
+            vae=vae,
+            text_encoder=text_encoder,
+            tokenizer=tokenizer,
+        )
+        self.vae_scale_factor = (
+            2 ** (len(self.vae.config.block_out_channels) - 1)
+            if getattr(self, "vae", None) else 8
+        )
+```
+
+### `__call__` flow (always this order)
+
+1. Input validation (`check_inputs`)
+2. Encode prompt (`encode_prompt`)
+3. Prepare timesteps (`set_timesteps`)
+4. Prepare latents (`prepare_latents`)
+5. Denoising loop (iterate `self.scheduler.timesteps`)
+6. Decode latents (VAE decode)
+7. Post-processing and return
+
+### Critical rules
+
+- **Always** decorate `__call__` with `@torch.no_grad()`
+- **Never** add `@torch.no_grad()` to helper methods called from `__call__` — it's redundant and blocks gradient-enabled callers
+- **Never** subclass another pipeline for a variant — each variant gets its own file and class
+- **Never** modify registered component state from inside `__call__` (no `.to(dtype)`, no attribute changes)
+- **Always** use `self.scheduler.step(noise_pred, t, latents).prev_sample` — never inline scheduler math
+- Config-derived static values go in `__init__` as `self.foo = ...`, not as `@property`
+- `@property` is reserved for per-call state only
+
+### Lifecycle methods (public vs private)
+
+- Public: `check_inputs`, `encode_prompt`, `prepare_latents`, `__call__`
+- Private (`_foo`): helpers only used by one method — or better, absorb into caller
+- Module-level functions: shared utilities used across files
+
+## Modular pipeline structure
+
+Reference implementations: `modular_pipelines/qwenimage/`, `modular_pipelines/flux2/`, `modular_pipelines/wan/`.
+
+Directory slugs are concatenated lowercase (`qwenimage`, `flux2`, `wan`). See `00-architecture.mdc`.
+
+### File split
+
+| File | Purpose |
+|------|---------|
+| `encoders.py` | Text encoder + image/video VAE encoder blocks |
+| `before_denoise.py` | Timesteps, latent prep, noise setup |
+| `denoise.py` | Denoising loop (hardest) |
+| `decoders.py` | VAE decode block |
+| `modular_blocks_<slug>.py` | Block assembly |
+| `modular_pipeline.py` | Pipeline class (mostly config) |
+
+### Block type decision tree
+
+- Single operation → `ModularPipelineBlocks` (leaf)
+- Multiple blocks in sequence → `SequentialPipelineBlocks`
+- Iterating (e.g., denoise loop) → `LoopSequentialPipelineBlocks`
+- Choose ONE block based on input → `AutoPipelineBlocks` (simple trigger) or `ConditionalPipelineBlocks` (custom logic)
+
+### Build order (start with easiest)
+
+1. `decoders.py` — simplest (latents in → images out)
+2. `encoders.py` — (prompt in → embeds out)
+3. `before_denoise.py` — (timesteps, latent prep, noise)
+4. `denoise.py` — hardest (convert guidance to guider abstraction)
+
+### Key modular rules
+
+- **Never import from `diffusers.pipelines.*`** — modular and standard are parallel systems
+- **Never cross-import between modular pipelines** — share via `modular_pipeline_utils.py`
+- **Never accept `guidance_scale` as pipeline input** — belongs to guider configuration
+- **Never instantiate components inline** — register as `ComponentSpec`, access via `components.`
+- **Never use `.template()` when semantics don't match** — declare field directly with accurate description
+- **Always declare outputs** — `block_state.foo = ...` requires `OutputParam("foo", ...)` in `intermediate_outputs`
+- **Prefer flat block assembly** — avoid deeply nested Auto/Sequential/Auto compositions
+- Standalone block reusability: each block must be runnable independently

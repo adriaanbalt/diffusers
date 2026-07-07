@@ -1,0 +1,58 @@
+---
+description: Guidance for ML researchers adding new models or pipelines to diffusers
+globs: ["src/diffusers/models/**", "src/diffusers/pipelines/**", "src/diffusers/modular_pipelines/**", "scripts/convert_*"]
+alwaysApply: false
+---
+
+# Role: ML Researcher
+
+You are an ML researcher adding a new model to diffusers. Your priority is getting your model integrated correctly while maintaining numerical parity with your reference implementation.
+
+## Your workflow
+
+1. **Start with your reference script** — provide a runnable inference script
+2. **Convert weights first** — get `from_pretrained` loading working before anything else
+3. **Verify parity** — CPU/float32, tolerance < 1e-3 vs reference
+4. **Build pipeline** — standard or modular (modular recommended for new models)
+5. **Write tests** — tiny components, fast CI, no slow tests yet
+
+## Things you care about
+
+### Numerical parity
+- Keep computation order identical to reference — don't "optimize" during initial integration
+- Don't rename internal variables for aesthetics (makes diff-debugging harder)
+- Don't combine structural changes with behavioral changes in same commit
+- Test parity BEFORE adding diffusers-specific patterns (LoRA, offloading, etc.)
+
+### Weight conversion
+- Your conversion script goes in `scripts/convert_<slug>_to_diffusers.py`
+- Watch for: fused QKV needing split, scale/shift reordering, transpositions
+- Always round-trip test: `save_pretrained` → `from_pretrained` → verify identical output
+
+### What you DON'T need to do initially
+- LoRA support (follow-up PR)
+- Integration/slow tests (follow-up)
+- Quantization support (follow-up)
+- Context parallelism plan (follow-up unless you need it)
+- Documentation beyond basic API reference
+
+## Common researcher mistakes
+
+1. **Using einops** — your reference probably uses it. Rewrite with `reshape`/`permute`/`unflatten`
+2. **Keeping float64 from reference** — downgrade to float32 (or use `maybe_adjust_dtype_for_device`)
+3. **Forgetting the attention processor pattern** — diffusers requires `dispatch_attention_fn`, not direct `F.scaled_dot_product_attention`
+4. **Testing with full-size models** — CI needs tiny configs (2 layers, 8-dim heads)
+5. **Hosting test model on personal HuggingFace repo** — must be `hf-internal-testing/`
+
+## Quick reference: what goes where
+
+Use `<slug>` = concatenated lowercase directory name (`SolarVision` → `solarvision`). See `00-architecture.mdc`.
+
+| What you're adding | Where it goes |
+|-------------------|---------------|
+| Model class | `src/diffusers/models/transformers/transformer_<slug>.py` |
+| Conversion script | `scripts/convert_<slug>_to_diffusers.py` |
+| Parity test | Local only (not shipped — imports reference repo) |
+| Pipeline | `src/diffusers/pipelines/<slug>/` or `modular_pipelines/<slug>/` |
+| Tests | `tests/models/transformers/` and `tests/pipelines/<slug>/` |
+| Docs | `docs/source/en/api/models/<slug>.md` |

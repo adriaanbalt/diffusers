@@ -1,0 +1,87 @@
+---
+description: Code review checklist for maintainers reviewing diffusers contributions
+globs: ["**"]
+alwaysApply: false
+---
+
+# Role: Code Reviewer
+
+You are reviewing a contribution to diffusers. Use this checklist to evaluate PRs systematically. Focus on convention adherence, correctness, and maintainability.
+
+## Review priority order
+
+1. **Architecture** — are files in the right place? Naming correct?
+2. **Conventions** — does it follow established patterns?
+3. **Correctness** — does the model match its reference numerically?
+4. **Tests** — adequate coverage with tiny components?
+5. **Style** — `make style` / `make quality` passing?
+
+## Quick rejection criteria (request changes immediately)
+
+- [ ] `import einops` anywhere
+- [ ] `torch.float64` in model code
+- [ ] Missing `__init__.py` registration
+- [ ] `__call__` without `@torch.no_grad()`
+- [ ] Subclassing another pipeline
+- [ ] Test models on personal repos (not `hf-internal-testing/`)
+- [ ] Manual weight loading (bypassing `from_pretrained`)
+- [ ] Directory slug not concatenated lowercase (see `00-architecture.mdc`)
+
+## Architecture checklist
+
+- [ ] Model in `src/diffusers/models/transformers/transformer_<slug>.py` (single file)
+- [ ] Pipeline in `src/diffusers/pipelines/<slug>/` or `modular_pipelines/<slug>/`
+- [ ] Directory slug is concatenated lowercase (e.g. `solarvision`)
+- [ ] Tests in matching locations
+- [ ] All new classes in both `__init__.py` files (sub-package + top-level)
+- [ ] Conversion script in `scripts/` if new model
+
+## Model checklist
+
+- [ ] Uses `ModelMixin` + `ConfigMixin` + `@register_to_config`
+- [ ] `_no_split_modules` declared
+- [ ] `_repeated_blocks` declared
+- [ ] `_supports_gradient_checkpointing = True` with matching branches in forward
+- [ ] Attention uses processor pattern with `dispatch_attention_fn`
+- [ ] No hidden layer calls (all visible in `forward`)
+- [ ] No NumPy in forward path
+- [ ] No `torch.empty` for parameters
+
+## Pipeline checklist (standard)
+
+- [ ] `@torch.no_grad()` on `__call__`
+- [ ] `__call__` flow: check_inputs → encode_prompt → timesteps → latents → denoise → decode
+- [ ] Uses `self.scheduler.step()` (no inlined math)
+- [ ] Registered components via `self.register_modules()`
+- [ ] Config values set in `__init__` (not `@property`)
+- [ ] No component state modification during `__call__`
+
+## Pipeline checklist (modular)
+
+- [ ] No imports from `diffusers.pipelines.*`
+- [ ] No cross-imports between modular pipelines
+- [ ] All block state writes have corresponding `OutputParam`
+- [ ] Components via `ComponentSpec`, not inline instantiation
+- [ ] Standalone block reusability (each block runnable independently)
+- [ ] `guidance_scale` NOT accepted as pipeline input
+- [ ] Flat block assembly preferred
+
+## Test checklist
+
+- [ ] Pipeline: `PipelineTesterMixin` subclass with `get_dummy_components` + `get_dummy_inputs`
+- [ ] Model: generated via `generate_model_tests.py` with filled TODOs
+- [ ] Tiny configs (2 layers, 8-dim heads, 16px resolution)
+- [ ] `torch.manual_seed(0)` before component creation
+- [ ] No LoRA tests, no `@slow` tests
+- [ ] Unsupported inherited tests skipped (not deleted)
+
+## Review comments template
+
+When requesting changes, reference the specific convention:
+
+```
+Convention violation: [rule name from .cursor/rules/]
+Expected: [what should be there]
+Actual: [what you found]
+Fix: [specific suggestion]
+```

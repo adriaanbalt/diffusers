@@ -1,0 +1,32 @@
+# Boundary enforcement for diffusers contributions
+# These files require manual review and should not be AI-modified
+
+# CI configuration
+.github/workflows/*.yml
+
+# Package metadata and release tooling
+setup.py
+pyproject.toml
+setup.cfg
+MANIFEST.in
+
+# Security-sensitive files
+*.pem
+*.key
+.env*
+secrets/
+
+# Release scripts
+scripts/release_*.py
+
+# Generated files (will be overwritten)
+src/diffusers/utils/dummy_*.py
+
+# Large binary files
+*.bin
+*.safetensors
+*.ckpt
+*.pt
+
+# Third-party vendored code
+third_party/

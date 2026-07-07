@@ -1,0 +1,116 @@
+---
+description: Diffusers file structure, naming conventions, and where new code belongs
+globs: ["src/diffusers/**", "tests/**", "docs/**"]
+alwaysApply: false
+---
+
+# Diffusers Architecture & File Structure
+
+## Repository layout
+
+New contributions follow this exact structure. Do not deviate.
+
+```
+src/diffusers/
+  models/transformers/transformer_<slug>.py   # Core model implementation (slug = concatenated lowercase, e.g. solarvision)
+  models/autoencoders/autoencoder_<slug>.py   # VAE (if new)
+  schedulers/scheduling_<slug>.py             # Custom scheduler (if needed)
+  pipelines/<slug>/
+    __init__.py                                # Lazy imports
+    pipeline_<slug>.py                        # Main pipeline
+    pipeline_<slug>_<variant>.py              # Variant (img2img, inpaint)
+    pipeline_output.py                         # Output dataclass
+  modular_pipelines/<slug>/
+    __init__.py                                # Lazy imports
+    modular_pipeline.py                        # Pipeline class (config-only)
+    encoders.py                                # Text/image/video encoder blocks
+    before_denoise.py                          # Pre-denoise setup blocks
+    denoise.py                                 # Denoising loop blocks
+    decoders.py                                # VAE decode block
+    modular_blocks_<slug>.py                  # Block assembly (AutoBlocks)
+  loaders/lora_pipeline.py                     # LoRA mixin (extend existing file)
+
+tests/
+  models/transformers/test_models_transformer_<slug>.py
+  pipelines/<slug>/test_<slug>.py
+
+docs/source/en/
+  _toctree.yml                                 # Register new pages
+  api/models/<slug>.md
+  api/pipelines/<slug>.md
+
+scripts/
+  convert_<slug>_to_diffusers.py              # Weight conversion script
+```
+
+> **`<slug>`** = concatenated lowercase directory name (`SolarVision` → `solarvision`). See naming table below.
+
+## Naming conventions
+
+Diffusers uses **two different naming shapes** — do not confuse them:
+
+| Use case | Format | Example (display name: **SolarVision**) |
+|----------|--------|----------------------------------------|
+| **Directory slug** (`<slug>`) | lowercase, concatenated | `solarvision` |
+| **Python files** | lowercase + underscores between prefix and slug | `transformer_solarvision.py`, `pipeline_solarvision.py` |
+| **Class names** | PascalCase, preserve word boundaries | `SolarVisionTransformer2DModel`, `SolarVisionModularPipeline` |
+
+### Directory slug rule (critical for Phase 2)
+
+When the user says **"SolarVision"**, **"solar vision"**, or **"solar-vision"**, the directory slug is always:
+
+```
+solarvision
+```
+
+Reference examples from the repo:
+
+| Display name | Directory slug |
+|--------------|----------------|
+| Qwen Image | `qwenimage` |
+| Flux 2 | `flux2` |
+| SolarVision | `solarvision` |
+| Wan | `wan` |
+
+### Slug normalization (apply before creating any files)
+
+1. Take the pipeline/model display name (e.g. `SolarVision`)
+2. Lowercase: `solarvision`
+3. Remove spaces, hyphens, underscores between words: `solarvision`
+4. Use that slug for **all directory paths**: `modular_pipelines/solarvision/`, `pipelines/solarvision/`, `tests/pipelines/solarvision/`
+5. Use the same slug in **file names**: `transformer_solarvision.py`, `modular_blocks_solarvision.py`, `convert_solarvision_to_diffusers.py`
+
+### File and class naming
+
+- Model files: `transformer_<slug>.py` (e.g. `transformer_solarvision.py`)
+- Pipeline files: `pipeline_<slug>.py` or `pipeline_<slug>_<variant>.py`
+- Test files: `test_<slug>.py` or `test_models_transformer_<slug>.py`
+- Class names: PascalCase (e.g. `SolarVisionTransformer2DModel`, `FluxTransformer2DModel`)
+- Scheduler files: `scheduling_<name>.py` (note: "scheduling" not "scheduler")
+
+**Exception:** Legacy pipelines like `stable_diffusion` predate this convention. All **new** contributions use concatenated slugs.
+
+## Single-file policy (models)
+
+A model's full implementation lives in ONE file. Attention classes, transformer blocks, RoPE, and model-specific layers all go in `transformer_<slug>.py`.
+
+For shared building blocks, either:
+- Import from `normalization.py`, `attention.py`, or `embeddings.py`
+- Use `# Copied from diffusers...` headers for cross-model reuse
+
+## Import registration (critical — most common new-contributor mistake)
+
+Every new class MUST be registered in:
+1. The sub-package `__init__.py` (e.g., `src/diffusers/pipelines/<slug>/__init__.py`)
+2. The top-level `src/diffusers/__init__.py` (`_import_structure` and `_lazy_modules`)
+
+Missing either causes `ImportError` that only appears when users try `from diffusers import YourNewClass`.
+
+## Standard vs Modular pipelines
+
+**Default to modular for new pipelines.** Standard `DiffusionPipeline` is still supported but modular is preferred, especially for:
+- Models with modality baked into the checkpoint
+- Actively evolving models
+- Models that don't fit a fixed task-based structure
+
+Ask before choosing: "Should this pipeline be modular (recommended) or standard?"

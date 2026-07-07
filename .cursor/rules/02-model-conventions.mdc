@@ -1,0 +1,118 @@
+---
+description: Model implementation rules and patterns for transformers, VAEs, and components
+globs: ["src/diffusers/models/**"]
+alwaysApply: false
+---
+
+# Model Conventions
+
+## Core requirements
+
+Reference implementations: `transformer_flux.py`, `transformer_wan.py`, `transformer_qwenimage.py`.
+
+### Mixin and config
+
+```python
+class MyModelTransformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, FromOriginalModelMixin):
+    _supports_gradient_checkpointing = True
+    _no_split_modules = ["MyModelTransformerBlock"]
+    _repeated_blocks = ["MyModelTransformerBlock"]
+    _skip_layerwise_casting_patterns = ["patch_embedding", "norm"]
+    
+    @register_to_config
+    def __init__(self, num_layers=28, attention_head_dim=128, ...):
+        super().__init__()
+        self.gradient_checkpointing = False
+        # ... build layers ...
+```
+
+### Class attributes (set all that apply)
+
+| Attribute | Purpose | Required? |
+|-----------|---------|-----------|
+| `_no_split_modules` | Prevents accelerate from splitting blocks across devices | Always |
+| `_repeated_blocks` | Enables `compile_repeated_blocks()` for regional torch.compile | Always |
+| `_supports_gradient_checkpointing` | Gate for `enable_gradient_checkpointing()` | Always (set True) |
+| `_skip_layerwise_casting_patterns` | Modules that stay in full precision during layerwise casting | If applicable |
+| `_keep_in_fp32_modules` | Modules kept in float32 when loading in bfloat16 | If applicable |
+| `_cp_plan` | Context parallelism sharding plan | If supporting CP |
+
+## Attention pattern (mandatory)
+
+Both the `Attention` class and its processor are defined in the model file:
+
+```python
+class MyModelAttnProcessor:
+    _attention_backend = None
+    _parallel_config = None
+
+    def __call__(self, attn, hidden_states, attention_mask=None, ...):
+        query = attn.to_q(hidden_states)
+        key = attn.to_k(hidden_states)
+        value = attn.to_v(hidden_states)
+        hidden_states = dispatch_attention_fn(
+            query, key, value,
+            attn_mask=attention_mask,
+            backend=self._attention_backend,
+            parallel_config=self._parallel_config,
+        )
+        hidden_states = hidden_states.flatten(2, 3)
+        return attn.to_out[0](hidden_states)
+
+class MyModelAttention(nn.Module, AttentionModuleMixin):
+    _default_processor_cls = MyModelAttnProcessor
+    _available_processors = [MyModelAttnProcessor]
+```
+
+### Attention mask rules
+
+- No mask needed → pass `None`, never an all-zero tensor
+- Padding mask → `bool (B, L)` or `(B, 1, 1, L)`, only when batch actually contains padding
+- If all sequences are same length → set mask to `None` (avoids backend errors)
+- Never declare `attention_mask` in forward signature if you ignore it
+
+## Strict prohibitions
+
+| Don't | Do instead |
+|-------|-----------|
+| Use `einops` | Rewrite with `reshape`, `permute`, `unflatten` |
+| Use `torch.float64` / `.double()` | Use `torch.float32` or `maybe_adjust_dtype_for_device` |
+| Use `torch.empty` for params | Use `torch.zeros` or `torch.ones` |
+| Hardcode dtype in forward | Derive from input tensor's dtype or `self.dtype` |
+| Cast via `self.linear.weight.dtype` | Read dtype from input tensor |
+| Hide layer calls in helper functions | All `nn.Module` calls visible directly in `forward` |
+| Add graph-breaking ops (numpy in forward) | Keep `torch.compile(fullgraph=True)` compatible |
+| Add new mandatory dependencies | Guard with `is_X_available()` + dummy object |
+| Override `from_pretrained` | Use standard loading paths |
+| Load weights manually at runtime | Use `from_pretrained` / `from_single_file` |
+
+## Gradient checkpointing implementation
+
+```python
+# In __init__:
+self.gradient_checkpointing = False
+
+# In forward:
+for block in self.transformer_blocks:
+    if torch.is_grad_enabled() and self.gradient_checkpointing:
+        hidden_states = self._gradient_checkpointing_func(
+            block.__call__, hidden_states, encoder_hidden_states, ...
+        )
+    else:
+        hidden_states = block(hidden_states, encoder_hidden_states, ...)
+```
+
+## Weight conversion
+
+Conversion scripts go in `scripts/convert_<slug>_to_diffusers.py` (slug = concatenated lowercase, e.g. `convert_solarvision_to_diffusers.py`):
+1. Map original state-dict keys to diffusers module names
+2. Instantiate diffusers model from config
+3. Load converted state dict
+4. `save_pretrained(...)` → `from_pretrained(...)` round-trip test
+
+Common conversion patterns to watch for:
+- Fused QKV weights needing split into separate Q, K, V
+- Scale/shift ordering (`[shift, scale]` → `[scale, shift]`)
+- Weight transpositions
+- Interleaved head dimensions needing reshape
+- Bias terms absorbed into different layers

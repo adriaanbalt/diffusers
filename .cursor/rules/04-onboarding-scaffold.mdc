@@ -1,0 +1,77 @@
+---
+description: Guided workflow for new engineers making their first contribution to diffusers
+globs: ["**"]
+alwaysApply: true
+---
+
+# First Contribution Scaffold
+
+When a user asks to "add a new pipeline", "add a new model", "contribute to diffusers", or similar — guide them through discovery and file structure setup. Do not dump all steps at once; reveal progressively as they complete each phase.
+
+## Phase 1: Gather context
+
+Before writing any code, collect:
+
+1. **Reference implementation** — ask for the GitHub link to the original model repo
+2. **Inference script** — get a runnable end-to-end script for the basic workflow (e.g., text-to-video)
+3. **Workflow variants** — ask what other workflows to support (img2img, inpaint, etc.)
+4. **Standard vs modular** — recommend modular (default), confirm with user
+
+Confirm the plan: "I'll integrate model X with pipeline Y based on your script, starting with [workflow]. Does this sound right?"
+
+**Before Phase 2:** Normalize the model name to a directory slug (see `00-architecture.mdc`):
+- `SolarVision` → slug `solarvision`
+- State the slug explicitly in the plan: "Files will go under `modular_pipelines/solarvision/`"
+
+## Phase 2: Set up file structure
+
+**First:** Confirm the directory slug out loud, e.g. `solarvision`. Then create all files using that slug.
+
+Create all files following the architecture rule (see `00-architecture.mdc`):
+
+```
+src/diffusers/
+  models/transformers/transformer_<slug>.py          # e.g. transformer_solarvision.py
+  modular_pipelines/<slug>/                          # e.g. modular_pipelines/solarvision/
+    __init__.py
+    modular_pipeline.py
+    encoders.py
+    before_denoise.py
+    denoise.py
+    decoders.py
+    modular_blocks_<slug>.py                         # e.g. modular_blocks_solarvision.py
+  (or pipelines/<slug>/... if standard)
+
+tests/
+  models/transformers/test_models_transformer_<slug>.py
+  pipelines/<slug>/test_<slug>.py
+
+docs/source/en/api/models/<slug>.md
+docs/source/en/api/pipelines/<slug>.md
+
+scripts/convert_<slug>_to_diffusers.py               # e.g. convert_solarvision_to_diffusers.py
+```
+
+Register imports immediately:
+- Sub-package `__init__.py` (lazy imports)
+- Top-level `src/diffusers/__init__.py` (`_import_structure`)
+
+## After Phase 2 — stop
+
+When the skeleton exists and imports are registered, stop. Say:
+
+> "Skeleton is ready — paths and imports are in place."
+
+Do not continue into model implementation, pipeline logic, or tests. Do not offer next steps or ask about scope.
+
+## Common first-contribution mistakes to avoid
+
+1. Forgetting to register imports in BOTH `__init__.py` files
+2. Using `einops` instead of native PyTorch reshaping
+3. Hardcoding dtype in forward methods
+4. Making test components too large (slow CI)
+5. Adding LoRA tests in initial PR
+6. Subclassing another pipeline instead of creating a new file
+7. Importing from `diffusers.pipelines.*` in modular pipeline code
+8. Missing `@torch.no_grad()` on `__call__`
+9. **Directory slug format** — use concatenated lowercase per `00-architecture.mdc` (e.g. `modular_pipelines/solarvision/`).
