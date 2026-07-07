@@ -1,0 +1,63 @@
+# Copyright 2026 The HuggingFace Team. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from ...loaders import Lumina2LoraLoaderMixin
+from ..modular_pipeline import ModularPipeline
+
+
+class SolarVisionModularPipeline(ModularPipeline, Lumina2LoraLoaderMixin):
+    """
+    A ModularPipeline for SolarVision text-to-image generation.
+
+    > [!WARNING] > This is an experimental feature and is likely to change in the future.
+    """
+
+    default_blocks_name = "SolarVisionAutoBlocks"
+
+    @property
+    def default_height(self):
+        return self.default_sample_size * self.vae_scale_factor
+
+    @property
+    def default_width(self):
+        return self.default_sample_size * self.vae_scale_factor
+
+    @property
+    def default_sample_size(self):
+        if getattr(self, "transformer", None) is not None:
+            return self.transformer.config.sample_size
+        return 128
+
+    @property
+    def patch_size(self):
+        if getattr(self, "transformer", None) is not None:
+            return self.transformer.config.patch_size
+        return 2
+
+    @property
+    def vae_scale_factor(self):
+        return 8
+
+    @property
+    def num_channels_latents(self):
+        if getattr(self, "transformer", None) is not None:
+            return self.transformer.config.in_channels
+        return 16
+
+    @property
+    def system_prompt(self):
+        return (
+            "You are an assistant designed to generate superior images with the superior degree of "
+            "image-text alignment based on textual prompts or user prompts."
+        )

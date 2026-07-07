@@ -391,6 +391,8 @@
         title: SD3Transformer2DModel
       - local: api/models/skyreels_v2_transformer_3d
         title: SkyReelsV2Transformer3DModel
+      - local: api/models/solarvision
+        title: SolarVisionTransformer2DModel
       - local: api/models/stable_audio_transformer
         title: StableAudioDiTModel
       - local: api/models/transformer2d
@@ -689,6 +691,8 @@
         title: Motif-Video
       - local: api/pipelines/skyreels_v2
         title: SkyReels-V2
+      - local: api/pipelines/solarvision
+        title: SolarVision
       - local: api/pipelines/stable_diffusion/svd
         title: Stable Video Diffusion
       - local: api/pipelines/wan
