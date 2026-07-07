@@ -45,7 +45,7 @@ Use **Plan mode** for discovery (Phase 1), then **Agent mode** for file creation
 3. Registering imports in `__init__.py` files
 4. Implementing the model with correct patterns
 5. Converting weights
-6. Writing tests and running `make quality`
+6. Writing tests and docs
 
 For Phases 3–6 on demand, invoke the **`implement-contribution`** skill (`.cursor/skills/`).
 
@@ -55,20 +55,39 @@ As you write code, rules activate based on which files you're editing:
 - `src/diffusers/models/` → `02-model-conventions.mdc`
 - `src/diffusers/pipelines/` or `modular_pipelines/` → `01-pipeline-conventions.mdc`
 - `tests/` → `03-testing-standards.mdc`
-
-Upstream diffusers also ships `.ai/AGENTS.md` and `.ai/skills/` — use `self-review` before PR; it mirrors the `@claude` CI reviewer rubric.
+- Any review pass → `05-code-review.mdc` (anti-patterns) and `07-multi-role-reviewer.mdc` (checklist)
 
 ### Step 4: Validate before submitting
 
+Run these in order after Phases 3–6:
+
+**1. Convention review** — catches issues pytest won't (einops, missing `__init__.py` registration, modular anti-patterns). In Cursor, ask the agent:
+
+```
+Review slug <your-model> for convention violations. Use the checklists in
+05-code-review.mdc and 07-multi-role-reviewer.mdc — architecture first, then
+conventions, then tests. List blocking issues vs warnings. Report only; do not edit.
+```
+
+Fix blocking issues before running mechanical gates.
+
+**2. Mechanical validation** — invoke **`validate-contribution`** (`.cursor/skills/`) — e.g. `/validate-contribution slug <your-model>`. It runs `make style`, `make quality`, repository consistency checks, slug-scoped pytest, and confirms a clean working tree.
+
+Manual equivalent (non-Cursor or quick reference):
+
 ```bash
 make style && make quality
-python -m pytest tests/pipelines/<your-model>/ -x
+make fix-copies && python utils/check_copies.py && python utils/check_dummies.py
+python -m pytest tests/modular_pipelines/<your-model>/ -x    # modular
+python -m pytest tests/pipelines/<your-model>/ -x            # standard
 python -m pytest tests/models/transformers/test_models_transformer_<your-model>.py -x
 ```
 
-Ask the agent: **"Review this file for convention violations"** before opening the PR.
+See the `validate-contribution` skill for the full fix loop and known-failure tables.
 
-After rollout Phase 2, a **hook** (`.cursor/hooks/quality-reminder.py`) nudges these gates when pipeline files are written.
+**3. Upstream self-review** — run **`self-review`** (`.ai/skills/self-review`) on your full branch diff. It uses the same rubric as the `@claude` CI reviewer — dead code, ephemeral comments, upstream conventions.
+
+The **quality-reminder** hook (`.cursor/hooks/quality-reminder.py`) nudges you toward `validate-contribution` when pipeline, model, or API doc files change.
 
 ### Step 5: Submit your PR
 
@@ -83,6 +102,7 @@ After rollout Phase 2, a **hook** (`.cursor/hooks/quality-reminder.py`) nudges t
 | "I want to add a pipeline" | **Plan** → **Agent** | Discovery first; engineer approves diffs |
 | "What does this pipeline do?" (PM) | **Ask** | Explain only — no file edits |
 | "Review this PR" | **Agent** + reviewer rule | Checklist from `07-multi-role-reviewer.mdc` |
+| "Ready to open a PR" | **Agent** + skills | Convention review → `validate-contribution` → `self-review` |
 | Large ambiguous refactor | **Plan** | Confirm scope before edits |
 
 **Agents may touch:** `src/`, `tests/`, `docs/source/en/api/`, `scripts/convert_*`  
@@ -114,5 +134,8 @@ See `08-multi-role-ops.mdc` for CI stages and protected paths.
 ## Getting help
 
 - `.cursor/rules/` — topic-specific guidance
+- `.cursor/skills/implement-contribution` — Phases 3–6 implementation playbook
+- `.cursor/skills/validate-contribution` — pre-PR mechanical gates
 - `05-code-review.mdc` — anti-patterns with fixes
+- `.ai/skills/self-review` — full-diff review against upstream rubric
 - Ask Cursor: "What's the convention for [X]?"
