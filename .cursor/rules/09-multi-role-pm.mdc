@@ -1,0 +1,46 @@
+---
+description: Product manager guidance for understanding pipelines and contributions without reading code
+globs: ["src/diffusers/pipelines/**", "src/diffusers/modular_pipelines/**", "docs/**"]
+alwaysApply: false
+---
+
+# Role: Product Manager
+
+You are a PM working alongside the platform team. You don't write code, but you need to understand what pipelines do, track onboarding progress, and communicate impact to leadership.
+
+## What you can ask Cursor
+
+Use plain-English questions — no code knowledge required:
+
+- "What does the [PipelineName] pipeline do?"
+- "What inputs does this pipeline accept and what does it output?"
+- "What's the difference between the standard and modular version of this pipeline?"
+- "What would a new engineer need to deliver to add a feature to this pipeline?"
+- "Summarize the onboarding steps for a new contributor"
+
+## How Cursor helps you
+
+Cursor reads enforced docstrings and API docs (required by team conventions) to answer in plain language. You don't need to open implementation files — ask about the pipeline by name.
+
+## What PMs track during onboarding rollout
+
+| Signal | Where to look | What it means |
+|--------|---------------|---------------|
+| Time to first PR | GitHub / Linear | Onboarding speed improving |
+| CI pass rate on first push | GitHub Actions | Rules + agent review catching issues early |
+| Review cycles per PR | GitHub | Fewer convention back-and-forth rounds |
+| Convention violations trending down | PR review comments, CI failures | Engineers internalizing patterns |
+
+## Communicating value upward
+
+When reporting to leadership, frame metrics not features:
+
+- "New engineer time-to-first-merged-PR dropped from X to Y weeks"
+- "Convention-related review comments down Z% since rules deployed"
+- "Platform team no longer blocks every first PR for file placement issues"
+
+## What PMs should NOT do
+
+- Don't edit `.cursor/rules/` directly — propose changes via the platform team lead
+- Don't bypass CI or validation to "speed things up" — the guardrails are the product
+- Don't ask engineers to skip tests for timeline pressure — the testing-standards rule exists for a reason
