@@ -2,7 +2,7 @@
 
 What a Cursor Solutions Architect leaves behind after a lighthouse engagement — beyond the demo artifact in the repo.
 
-**Location:** `docs/cursor-onboarding/` — separate from HuggingFace library docs in `docs/source/en/`.
+**Location:** `cursor-onboarding/` — separate from HuggingFace library docs in `docs/source/en/`.
 
 ---
 
@@ -11,7 +11,7 @@ What a Cursor Solutions Architect leaves behind after a lighthouse engagement �
 | Layer | What it is | Where in repo |
 |-------|------------|---------------|
 | **Lighthouse artifact** | Rules, hooks, skills, `.cursorignore`, [`ONBOARDING.md`](../../ONBOARDING.md), [`GOVERNANCE.md`](../../GOVERNANCE.md) | Repo root + `.cursor/` |
-| **SA delivery docs** | Rollout, runbooks, metrics, role guides | **`docs/cursor-onboarding/`** (this folder) |
+| **SA delivery docs** | Rollout, runbooks, metrics, role guides | **`cursor-onboarding/`** (this folder) |
 
 **What you demo in 45 minutes** = lighthouse artifact (Blocks 3–7).  
 **What proves SA thinking** = this package (Block 9 / flex).

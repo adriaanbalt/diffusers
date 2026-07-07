@@ -59,7 +59,7 @@
 | Activity | Detail |
 |----------|--------|
 | Enable hooks | Turn on `.cursor/hooks.json` — `quality-reminder.py` nudges `make quality` after pipeline/model writes |
-| Role enablement sessions | Distribute `docs/cursor-onboarding/roles/*.md` — PM, QA, reviewer, DevOps (30 min each) |
+| Role enablement sessions | Distribute `cursor-onboarding/roles/*.md` — PM, QA, reviewer, DevOps (30 min each) |
 | Enable skills | `.cursor/skills/implement-contribution/` — on-demand Phases 3–6 after skeleton exists |
 | Champion program | Identify 1 staff engineer per team as rule maintainer |
 | Expand rule coverage | Add patterns discovered in lighthouse retro |

@@ -95,7 +95,7 @@ Hooks nudge; they do not replace CI or code review.
 | Rule/skill audit | Platform champion | Quarterly — remove rules unused 3+ months |
 | Privacy Mode verification | IT / security | Annual or on Cursor contract renewal |
 
-See also: `ONBOARDING.md`, `.cursor/rules/`, and the SA delivery package in [`docs/cursor-onboarding/`](docs/cursor-onboarding/CUSTOMER-DELIVERY-PACKAGE.md) (`ROLLOUT-PLAYBOOK.md`, `PLATFORM-RUNBOOK.md`).
+See also: `ONBOARDING.md`, `.cursor/rules/`, and the SA delivery package in [`cursor-onboarding/`](cursor-onboarding/CUSTOMER-DELIVERY-PACKAGE.md) (`ROLLOUT-PLAYBOOK.md`, `PLATFORM-RUNBOOK.md`).
 
 ---
 

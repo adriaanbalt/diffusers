@@ -15,7 +15,7 @@
 | AI boundaries | `.cursorignore` | Rarely — security review required |
 | Engineer guide | `ONBOARDING.md` (repo root) | When workflow changes |
 | Governance | `GOVERNANCE.md` (repo root) | Privacy, MCP approval, guardrails — security review |
-| Role guides | `docs/cursor-onboarding/roles/*.md` | When role workflows change |
+| Role guides | `cursor-onboarding/roles/*.md` | When role workflows change |
 
 **You do not own:** Cursor product settings, user licenses, org-wide MCP configs — coordinate with IT/admin.
 
@@ -111,7 +111,7 @@ Archive in PR description — don't silent-delete.
 | New hire onboarding | Day 1 | Point to `ONBOARDING.md`; 30 min Cursor walkthrough |
 | Rule change | Same week as PR merge | Slack post + link to diff |
 | Quarterly review | Every 3 months | 30 min — prune rules, review metrics |
-| Role session | On expand to new team | Use `docs/cursor-onboarding/roles/*.md` as handout |
+| Role session | On expand to new team | Use `cursor-onboarding/roles/*.md` as handout |
 
 ---
 
