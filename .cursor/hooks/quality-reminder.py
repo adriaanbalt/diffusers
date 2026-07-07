@@ -17,12 +17,14 @@ TRACKED_PATH_FRAGMENTS = (
     "tests/pipelines/",
     "tests/models/",
     "tests/modular_pipelines/",
+    "docs/source/en/_toctree.yml",
+    "docs/source/en/api/",
 )
 
 REMINDER = (
-    "Pipeline or model file was just written. Before opening a PR, invoke "
+    "Pipeline, model, or API doc file was just written. Before opening a PR, invoke "
     "**validate-contribution** (`.cursor/skills/validate-contribution/SKILL.md`) to run "
-    "`make style`, `make quality`, and pytest with the fix-and-re-run loop."
+    "`make style`, `make quality`, repository consistency checks, and pytest."
 )
 
 

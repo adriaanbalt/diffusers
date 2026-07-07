@@ -2,21 +2,21 @@
 name: implement-contribution
 description: >
   Use when an engineer finished onboarding scaffold (file structure exists) and needs to
-  implement the model, pipeline, and tests. Invoke on demand — e.g. "/implement-contribution
+  implement the model, pipeline, tests, and docs. Invoke on demand — e.g. "/implement-contribution
   slug solarvision". For validation gates before PR, use validate-contribution. Complements
   04-onboarding-scaffold.mdc and diffusers .ai/skills/model-integration.
 ---
 
-# Implement Contribution (Phases 3–5)
+# Implement Contribution (Phases 3–6)
 
 **Rollout Phase 3 skill** — on-demand playbook after the skeleton exists.
 
 Rules (`04-onboarding-scaffold.mdc`) teach passively during editing. This skill runs
-**implementation and tests** when the engineer knows what they're building.
+**implementation, tests, and docs** when the engineer knows what they're building.
 
 ## Execution contract
 
-Execute Phases 3–5 sequentially to completion. Do not stop or ask between phases. Do not run
+Execute Phases 3–6 sequentially to completion. Do not stop or ask between phases. Do not run
 `make quality`, `make style`, or pytest gates — that is `validate-contribution`. If you hit
 a blocker that requires real assets (weights, external repos), scaffold what you can, note
 the deferral, and continue to the next phase.
@@ -64,13 +64,25 @@ Follow `03-testing-standards.mdc`:
 2. Model tests: `python utils/generate_model_tests.py`, fill TODOs
 3. Skip LoRA, `@slow`, and integration tests in the initial PR
 
-## After Phase 5 — invoke validate-contribution
+## Phase 6 — API docs and TOC
 
-When implementation and tests are in place, stop. Say:
+Complete **before** handing off to `validate-contribution`:
 
-> "Implementation and tests are ready. Invoke **validate-contribution** to run quality gates before PR."
+1. Create `docs/source/en/api/models/<slug>.md` and `docs/source/en/api/pipelines/<slug>.md` stubs
+2. Append entries to `docs/source/en/_toctree.yml` in the correct sections — **do not sort by hand**
+3. Run `make style` once to auto-sort TOC entries and format doc stubs
 
-Do not run `make style`, `make quality`, or pytest. Do not declare the contribution complete.
+CI sorts `_toctree.yml` by the `local` path string, not display title. Manual ordering
+(e.g. placing SolarVision before Shap-E by name) will fail `check_doc_toc.py`.
+
+## After Phase 6 — invoke validate-contribution
+
+When implementation, tests, and docs are in place, stop. Say:
+
+> "Implementation, tests, and docs are ready. Invoke **validate-contribution** to run CI gates before PR."
+
+Do not run `make quality`, repository consistency checks, or pytest. Do not declare the
+contribution complete. Do not add docs in a separate commit after validation.
 
 ## How this fits the stack
 
@@ -78,8 +90,8 @@ Do not run `make style`, `make quality`, or pytest. Do not declare the contribut
 |-------|------|
 | **Rules** (Phase 1 rollout) | Passive conventions — always on while editing |
 | **Hook** (Phase 2 rollout) | `.cursor/hooks/quality-reminder.py` — nudge validation after writes |
-| **This skill** (Phase 3 rollout) | Phases 3–5: implement model, pipeline, tests |
-| **`validate-contribution`** | Pre-PR gates: `make quality` + pytest fix loop |
+| **This skill** (Phase 3 rollout) | Phases 3–6: model, pipeline, tests, docs |
+| **`validate-contribution`** | Pre-PR gates: quality + repo consistency + pytest |
 | **`.ai/skills/model-integration`** | Upstream diffusers reference — read during discovery |
 | **CI** | `pr_tests.yml` — hard merge gate |
 
@@ -87,5 +99,8 @@ Do not run `make style`, `make quality`, or pytest. Do not declare the contribut
 
 - Re-run Phase 1 discovery if the skeleton already exists
 - Run validation gates (that is `validate-contribution`)
+- Add docs or `_toctree.yml` entries after validation — docs belong in Phase 6
+- Manually sort `_toctree.yml`
+- Patch `.github/workflows/` to pass CI
 - Duplicate full rule text — cite the relevant `.mdc` file
 - Replace CI with custom validators
